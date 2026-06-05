@@ -26,3 +26,6 @@ scratch/
 .DS_Store
 .idea/
 .vscode/
+
+# Project workflow descriptions
+WORKFLOW_DESCRIPTION.md
