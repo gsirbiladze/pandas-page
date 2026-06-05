@@ -1,0 +1,28 @@
+# Virtual environment
+bin/
+etc/
+lib/
+lib64
+include/
+share/
+pyvenv.cfg
+.lock
+CACHEDIR.TAG
+
+# Editor swap files
+*.swp
+*.swo
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local data and scratch/verification scripts
+data/
+scratch/
+
+# OS/IDE metadata
+.DS_Store
+.idea/
+.vscode/
