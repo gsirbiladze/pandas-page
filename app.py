@@ -262,12 +262,12 @@ with st.sidebar:
     else:
         col_all_1, col_all_2 = st.columns(2)
         with col_all_1:
-            if st.button("Enable All", use_container_width=True):
+            if st.button("Enable All", width='stretch'):
                 for fp in sorted_files:
                     st.session_state[f"toggle_{db_manager.get_table_name(fp)}"] = True
                 st.rerun()
         with col_all_2:
-            if st.button("Disable All", use_container_width=True):
+            if st.button("Disable All", width='stretch'):
                 for fp in sorted_files:
                     st.session_state[f"toggle_{db_manager.get_table_name(fp)}"] = False
                 st.rerun()
@@ -346,7 +346,7 @@ if not active_tables:
             
         st.dataframe(
             pd.DataFrame(file_summary_data),
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
 
@@ -553,7 +553,7 @@ else:
                           file_name=f"filtered_{display_name}.csv",
                           mime="text/csv",
                           key=f"dl_{table_name}",
-                          use_container_width=True
+                          width='stretch'
                     )
                 
                 # Split screen layout: Table on Left, Chart on Right
@@ -561,7 +561,7 @@ else:
                 
                 with col_table:
                     # Display dataframe
-                    st.dataframe(df_filtered, use_container_width=True)
+                    st.dataframe(df_filtered, width='stretch')
                     
                 with col_chart:
                     st.markdown("<h4 style='margin-top: 0;'>📊 Data Distribution</h4>", unsafe_allow_html=True)
@@ -629,7 +629,7 @@ else:
                                 strokeWidth=0
                             )
                             
-                            st.altair_chart(pie_chart, use_container_width=True)
+                            st.altair_chart(pie_chart, width='stretch')
                         else:
                             st.info("No data available to plot.")
                     else:
