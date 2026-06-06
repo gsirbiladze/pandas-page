@@ -1,6 +1,6 @@
-# Data Explorer
+# Data Explorer (pandas-page)
 
-An elegant, lightweight, and white-labeled interactive dashboard built with **Streamlit** and **DuckDB** to explore, query, and filter local datasets in real-time.
+An elegant, lightweight interactive dashboard built with **Streamlit** and **DuckDB** to explore, query, and filter local datasets in real-time.
 
 ---
 
@@ -12,7 +12,6 @@ This application provides a zero-setup, self-hosted web interface to immediately
 ## 2. What It Does
 - **Auto-Discovery**: Instantly scans a target directory at startup and loads all discovered datasets.
 - **SQL-Powered Backend**: Uses an in-memory DuckDB connection to query datasets efficiently.
-- **Dynamic White-Labeled UI**: Keeps the engine details private, showing clean dataset names (stripping file extensions) in the sidebar.
 - **Automatic Directory Monitoring**: Periodically scans the folder in the background (using an interval you define) to automatically hot-reload modified files and drop tables for deleted files.
 - **Type-Aware Filtering**: Automatically scans columns and renders custom filter widgets based on data type:
   - Range sliders for numeric columns.
@@ -56,6 +55,6 @@ streamlit run app.py -- -d <directory_path> -i <refresh_interval_seconds> -t "<d
 ### Example Run
 To scan a folder called `./data` every `3` seconds with a custom title:
 ```bash
-streamlit run app.py -- -d ./data -i 3 -t "Business Insights Dashboard"
+streamlit run app.py --server.headless true --server.address localhost --server.port 8501 -- -d ./data -i 3 -t "Business Insights Dashboard"
 ```
 Once started, the terminal will provide a local URL (usually `http://localhost:8501`) to open the app in your browser.
