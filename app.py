@@ -1,15 +1,12 @@
 import os
 import re
-import sys
 import glob
-import time
 import argparse
 import datetime
 import pandas as pd
 import duckdb
 import altair as alt
 import streamlit as st
-import streamlit.components.v1 as components
 
 # 1. Parse command line arguments
 @st.cache_resource
