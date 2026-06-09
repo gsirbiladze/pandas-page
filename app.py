@@ -599,14 +599,14 @@ else:
                         df_counts.columns = ["Category", "Count"]
                         
                         # Group top categories and map others to "Other"
-                        limit_categories = 7
-                        if len(df_counts) > limit_categories:
-                            # Sort descending
-                            df_counts = df_counts.sort_values(by="Count", ascending=False)
-                            df_top = df_counts.head(limit_categories - 1).copy()
-                            other_count = df_counts.iloc[limit_categories - 1:]["Count"].sum()
-                            other_row = pd.DataFrame([{"Category": "Other", "Count": other_count}])
-                            df_counts = pd.concat([df_top, other_row], ignore_index=True)
+                        # limit_categories = 7
+                        # if len(df_counts) > limit_categories:
+                        #     # Sort descending
+                        #     df_counts = df_counts.sort_values(by="Count", ascending=False)
+                        #     df_top = df_counts.head(limit_categories - 1).copy()
+                        #     other_count = df_counts.iloc[limit_categories - 1:]["Count"].sum()
+                        #     other_row = pd.DataFrame([{"Category": "Other", "Count": other_count}])
+                        #     df_counts = pd.concat([df_top, other_row], ignore_index=True)
                             
                         # Compute percentage
                         total_cnt = df_counts["Count"].sum()
@@ -619,7 +619,7 @@ else:
                                 theta=alt.Theta(field="Count", type="quantitative"),
                                 color=alt.Color(
                                     field="Label", 
-                                    type="nominal", 
+                                    type="nominal",
                                     legend=alt.Legend(title="Category (%)", orient="bottom")
                                 ),
                                 tooltip=["Category", "Count", "Percentage"]
