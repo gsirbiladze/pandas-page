@@ -596,7 +596,7 @@ else:
                         
                         # Value counts
                         df_counts = series_shortened.value_counts().reset_index()
-                        df_counts.columns = ["Category", "Count"]
+                        df_counts.columns = ["Category", "GroupCount"]
                         
                         # Group top categories and map others to "Other"
                         # limit_categories = 7
@@ -609,20 +609,20 @@ else:
                         #     df_counts = pd.concat([df_top, other_row], ignore_index=True)
                             
                         # Compute percentage
-                        total_cnt = df_counts["Count"].sum()
+                        total_cnt = df_counts["GroupCount"].sum()
                         if total_cnt > 0:
-                            df_counts["Percentage"] = (df_counts["Count"] / total_cnt * 100).round(1)
+                            df_counts["Percentage"] = (df_counts["GroupCount"] / total_cnt * 100).round(1)
                             df_counts["Label"] = df_counts["Category"] + " (" + df_counts["Percentage"].astype(str) + "%)"
                             
                             # Draw Altair arc/pie chart
                             pie_chart = alt.Chart(df_counts).mark_arc(innerRadius=0).encode(
-                                theta=alt.Theta(field="Count", type="quantitative"),
+                                theta=alt.Theta(field="GroupCount", type="quantitative"),
                                 color=alt.Color(
                                     field="Label", 
                                     type="nominal",
                                     legend=alt.Legend(title="Category (%)", orient="bottom")
                                 ),
-                                tooltip=["Category", "Count", "Percentage"]
+                                tooltip=["Category", "GroupCount", "Percentage"]
                             ).properties(
                                 height=280
                             ).configure_view(
