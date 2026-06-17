@@ -108,6 +108,14 @@ def is_datetime(dtype):
     dt_types = ["DATE", "TIME", "TIMESTAMP", "TIMESTAMPTZ"]
     return any(dtt in dtype for dtt in dt_types)
 
+def select_all_cols(table_name, columns_info):
+    for (_, col_name, _, _, _, _) in columns_info:
+        st.session_state[f"chk_{table_name}_{col_name}"] = True
+
+def clear_all_cols(table_name, columns_info):
+    for (_, col_name, _, _, _, _) in columns_info:
+        st.session_state[f"chk_{table_name}_{col_name}"] = False
+
 # 4. Streamlit UI Setup
 st.set_page_config(
     page_title=APP_TITLE,
@@ -240,6 +248,40 @@ h1, h2, h3, h4, h5, h6 {
         color: #6ee7b7 !important;
         border: 1px solid #047857;
     }
+}
+
+/* Style Select All and Clear buttons as elegant clickable text links */
+div[data-testid="column"]:has(.select-all-btn) button,
+div[data-testid="column"]:has(.clear-btn) button {
+    background-color: transparent !important;
+    border: none !important;
+    color: #6366f1 !important; /* Brand indigo */
+    text-decoration: none !important;
+    padding: 0px 4px !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    height: auto !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    box-shadow: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    cursor: pointer !important;
+    transition: color 0.2s ease-in-out !important;
+}
+
+div[data-testid="column"]:has(.select-all-btn) button:hover,
+div[data-testid="column"]:has(.clear-btn) button:hover {
+    color: #ec4899 !important; /* Pink highlight on hover */
+    background-color: transparent !important;
+    text-decoration: underline !important;
+}
+
+div[data-testid="column"]:has(.select-all-btn) button:active,
+div[data-testid="column"]:has(.clear-btn) button:active {
+    color: #a855f7 !important;
+    background-color: transparent !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -378,155 +420,206 @@ else:
         
         # We wrap the content below the HTML card in a column container to align with card borders
         with st.container():
+            # Filter By Column expander
+            with st.expander("⚙️ Filter By Column", expanded=False):
+                # Initialize session state keys for the columns if they don't exist
+                for idx, (_, col_name, _, _, _, _) in enumerate(columns_info):
+                    chk_key = f"chk_{table_name}_{col_name}"
+                    if chk_key not in st.session_state:
+                        st.session_state[chk_key] = (idx < 3)
+
+                # 1. Column list checkboxes
+                col_slots_chk = st.columns(3)
+                selected_cols = []
+                for idx, (_, col_name, _, _, _, _) in enumerate(columns_info):
+                    slot_chk = col_slots_chk[idx % 3]
+                    chk_key = f"chk_{table_name}_{col_name}"
+                    with slot_chk:
+                        is_checked = st.checkbox(
+                            label=col_name,
+                            key=chk_key
+                        )
+                        if is_checked:
+                            selected_cols.append(col_name)
+
+                # Spacing/Divider
+                st.markdown("<hr style='margin: 12px 0 8px 0; border: 0; border-top: 1px dashed rgba(120, 120, 120, 0.2);'>", unsafe_allow_html=True)
+
+                # 2. Select All / Clear buttons styled as neat links underneath
+                col_btn1, col_btn2, _ = st.columns([1, 1, 8])
+                with col_btn1:
+                    st.markdown('<div class="select-all-btn"></div>', unsafe_allow_html=True)
+                    st.button(
+                        "Select All",
+                        key=f"sel_all_{table_name}",
+                        on_click=select_all_cols,
+                        args=(table_name, columns_info),
+                        use_container_width=True
+                    )
+                with col_btn2:
+                    st.markdown('<div class="clear-btn"></div>', unsafe_allow_html=True)
+                    st.button(
+                        "Clear",
+                        key=f"clear_all_{table_name}",
+                        on_click=clear_all_cols,
+                        args=(table_name, columns_info),
+                        use_container_width=True
+                    )
+
             # Section 1: Filters Expander
             with st.expander(f"🔍 Filter Controls for {display_name}", expanded=True):
-                # We show filters in a dynamic grid of columns (up to 3 columns)
-                col_slots = st.columns(3)
                 filters_sql = []
                 filters_params = []
                 
-                for idx, (col_id, col_name, col_type, _, _, _) in enumerate(columns_info):
-                    slot = col_slots[idx % 3]
-                    widget_key = f"filter_{table_name}_{col_name}"
+                if not selected_cols:
+                    st.info("No columns selected for filtering. Please select columns in the panel above.")
+                else:
+                    # We show filters in a dynamic grid of columns (up to 3 columns)
+                    col_slots = st.columns(3)
+                    filtered_cols_info = [col for col in columns_info if col[1] in selected_cols]
                     
-                    with slot:
-                        # Case 1: Numeric Filters
-                        if is_numeric(col_type):
-                            try:
-                                min_val, max_val = db_manager.conn.execute(
-                                    f'SELECT MIN("{col_name}"), MAX("{col_name}") FROM "{table_name}"'
-                                ).fetchone()
-                            except Exception:
-                                min_val, max_val = None, None
-                                
-                            if min_val is not None and max_val is not None and min_val < max_val:
-                                # Convert to float for slider compatibility
-                                min_f = float(min_val)
-                                max_f = float(max_val)
-                                # Determine range slider value
-                                slider_val = st.slider(
-                                    label=f"🔢 {col_name} (Range)",
-                                    min_value=min_f,
-                                    max_value=max_f,
-                                    value=(min_f, max_f),
-                                    key=widget_key
-                                )
-                                filters_sql.append(f'"{col_name}" BETWEEN ? AND ?')
-                                filters_params.extend([slider_val[0], slider_val[1]])
-                            elif min_val is not None:
-                                st.info(f"🔢 {col_name} (Constant: {min_val})")
-                                
-                        # Case 2: Boolean Filters
-                        elif col_type.upper() in ["BOOLEAN", "BOOL"]:
-                            bool_choice = st.selectbox(
-                                label=f"🔘 {col_name}",
-                                options=["All", "True", "False"],
-                                index=0,
-                                key=widget_key
-                            )
-                            if bool_choice == "True":
-                                filters_sql.append(f'"{col_name}" = TRUE')
-                            elif bool_choice == "False":
-                                filters_sql.append(f'"{col_name}" = FALSE')
-                                
-                        # Case 3: Datetime / Date Filters
-                        elif is_datetime(col_type):
-                            try:
-                                min_date_val, max_date_val = db_manager.conn.execute(
-                                    f'SELECT MIN("{col_name}"), MAX("{col_name}") FROM "{table_name}"'
-                                ).fetchone()
-                            except Exception:
-                                min_date_val, max_date_val = None, None
-                            
-                            # Handle converting to date
-                            if min_date_val is not None and max_date_val is not None:
-                                # Standardize date values
-                                if isinstance(min_date_val, str):
-                                    # Strip time parts if needed
-                                    min_date = datetime.datetime.strptime(min_date_val.split()[0], "%Y-%m-%d").date()
-                                    max_date = datetime.datetime.strptime(max_date_val.split()[0], "%Y-%m-%d").date()
-                                elif isinstance(min_date_val, (datetime.date, datetime.datetime)):
-                                    min_date = min_date_val.date() if isinstance(min_date_val, datetime.datetime) else min_date_val
-                                    max_date = max_date_val.date() if isinstance(max_date_val, datetime.datetime) else max_date_val
-                                else:
-                                    min_date, max_date = None, None
-                                    
-                                if min_date and max_date:
-                                    if min_date < max_date:
-                                        date_range = st.date_input(
-                                            label=f"📅 {col_name} (Range)",
-                                            value=(min_date, max_date),
-                                            min_value=min_date,
-                                            max_value=max_date,
-                                            key=widget_key
-                                        )
-                                        if isinstance(date_range, tuple) and len(date_range) == 2:
-                                            filters_sql.append(f'CAST("{col_name}" AS DATE) BETWEEN ? AND ?')
-                                            filters_params.extend([date_range[0], date_range[1]])
-                                        elif isinstance(date_range, tuple) and len(date_range) == 1:
-                                            filters_sql.append(f'CAST("{col_name}" AS DATE) >= ?')
-                                            filters_params.append(date_range[0])
-                                    else:
-                                        st.info(f"📅 {col_name} (Constant: {min_date})")
-                            
-                        # Case 4: Text or Categorical Select Filters
-                        else:
-                            # Let's count unique values
-                            try:
-                                unique_cnt = db_manager.conn.execute(
-                                    f'SELECT COUNT(DISTINCT "{col_name}") FROM "{table_name}"'
-                                ).fetchone()[0]
-                            except Exception:
-                                unique_cnt = 999
-                                
-                            if unique_cnt <= 12:
+                    for idx, (col_id, col_name, col_type, _, _, _) in enumerate(filtered_cols_info):
+                        slot = col_slots[idx % 3]
+                        widget_key = f"filter_{table_name}_{col_name}"
+                        
+                        with slot:
+                            # Case 1: Numeric Filters
+                            if is_numeric(col_type):
                                 try:
-                                    all_vals = [
-                                        row[0] for row in db_manager.conn.execute(
-                                            f'SELECT DISTINCT "{col_name}" FROM "{table_name}" WHERE "{col_name}" IS NOT NULL ORDER BY "{col_name}"'
-                                        ).fetchall()
-                                    ]
-                                    # Add None if there are nulls
-                                    null_cnt = db_manager.conn.execute(
-                                        f'SELECT COUNT(*) FROM "{table_name}" WHERE "{col_name}" IS NULL'
-                                    ).fetchone()[0]
-                                    if null_cnt > 0:
-                                        all_vals.append("<Null>")
+                                    min_val, max_val = db_manager.conn.execute(
+                                        f'SELECT MIN("{col_name}"), MAX("{col_name}") FROM "{table_name}"'
+                                    ).fetchone()
                                 except Exception:
-                                    all_vals = []
-                                
-                                if all_vals:
-                                    selected_vals = st.multiselect(
-                                        label=f"🗂️ {col_name} (Multi)",
-                                        options=all_vals,
-                                        default=all_vals,
+                                    min_val, max_val = None, None
+                                    
+                                if min_val is not None and max_val is not None and min_val < max_val:
+                                    # Convert to float for slider compatibility
+                                    min_f = float(min_val)
+                                    max_f = float(max_val)
+                                    # Determine range slider value
+                                    slider_val = st.slider(
+                                        label=f"🔢 {col_name} (Range)",
+                                        min_value=min_f,
+                                        max_value=max_f,
+                                        value=(min_f, max_f),
                                         key=widget_key
                                     )
-                                    if len(selected_vals) < len(all_vals):
-                                        if not selected_vals:
-                                            filters_sql.append("1=0") # No match
-                                        else:
-                                            has_null = "<Null>" in selected_vals
-                                            non_null_vals = [v for v in selected_vals if v != "<Null>"]
-                                            
-                                            sub_conds = []
-                                            if non_null_vals:
-                                                placeholders = ", ".join(["?"] * len(non_null_vals))
-                                                sub_conds.append(f'"{col_name}" IN ({placeholders})')
-                                                filters_params.extend(non_null_vals)
-                                            if has_null:
-                                                sub_conds.append(f'"{col_name}" IS NULL')
-                                                
-                                            filters_sql.append(f"({' OR '.join(sub_conds)})")
-                            else:
-                                text_val = st.text_input(
-                                    label=f"🔤 {col_name} (Contains)",
-                                    value="",
+                                    filters_sql.append(f'"{col_name}" BETWEEN ? AND ?')
+                                    filters_params.extend([slider_val[0], slider_val[1]])
+                                elif min_val is not None:
+                                    st.info(f"🔢 {col_name} (Constant: {min_val})")
+                                    
+                            # Case 2: Boolean Filters
+                            elif col_type.upper() in ["BOOLEAN", "BOOL"]:
+                                bool_choice = st.selectbox(
+                                    label=f"🔘 {col_name}",
+                                    options=["All", "True", "False"],
+                                    index=0,
                                     key=widget_key
                                 )
-                                if text_val.strip():
-                                    filters_sql.append(f'LOWER("{col_name}") LIKE ?')
-                                    filters_params.append(f"%{text_val.strip().lower()}%")
+                                if bool_choice == "True":
+                                    filters_sql.append(f'"{col_name}" = TRUE')
+                                elif bool_choice == "False":
+                                    filters_sql.append(f'"{col_name}" = FALSE')
+                                    
+                            # Case 3: Datetime / Date Filters
+                            elif is_datetime(col_type):
+                                try:
+                                    min_date_val, max_date_val = db_manager.conn.execute(
+                                        f'SELECT MIN("{col_name}"), MAX("{col_name}") FROM "{table_name}"'
+                                    ).fetchone()
+                                except Exception:
+                                    min_date_val, max_date_val = None, None
+                                
+                                # Handle converting to date
+                                if min_date_val is not None and max_date_val is not None:
+                                    # Standardize date values
+                                    if isinstance(min_date_val, str):
+                                        # Strip time parts if needed
+                                        min_date = datetime.datetime.strptime(min_date_val.split()[0], "%Y-%m-%d").date()
+                                        max_date = datetime.datetime.strptime(max_date_val.split()[0], "%Y-%m-%d").date()
+                                    elif isinstance(min_date_val, (datetime.date, datetime.datetime)):
+                                        min_date = min_date_val.date() if isinstance(min_date_val, datetime.datetime) else min_date_val
+                                        max_date = max_date_val.date() if isinstance(max_date_val, datetime.datetime) else max_date_val
+                                    else:
+                                        min_date, max_date = None, None
+                                        
+                                    if min_date and max_date:
+                                        if min_date < max_date:
+                                            date_range = st.date_input(
+                                                label=f"📅 {col_name} (Range)",
+                                                value=(min_date, max_date),
+                                                min_value=min_date,
+                                                max_value=max_date,
+                                                key=widget_key
+                                            )
+                                            if isinstance(date_range, tuple) and len(date_range) == 2:
+                                                filters_sql.append(f'CAST("{col_name}" AS DATE) BETWEEN ? AND ?')
+                                                filters_params.extend([date_range[0], date_range[1]])
+                                            elif isinstance(date_range, tuple) and len(date_range) == 1:
+                                                filters_sql.append(f'CAST("{col_name}" AS DATE) >= ?')
+                                                filters_params.append(date_range[0])
+                                        else:
+                                            st.info(f"📅 {col_name} (Constant: {min_date})")
+                                
+                            # Case 4: Text or Categorical Select Filters
+                            else:
+                                # Let's count unique values
+                                try:
+                                    unique_cnt = db_manager.conn.execute(
+                                        f'SELECT COUNT(DISTINCT "{col_name}") FROM "{table_name}"'
+                                    ).fetchone()[0]
+                                except Exception:
+                                    unique_cnt = 999
+                                    
+                                if unique_cnt <= 12:
+                                    try:
+                                        all_vals = [
+                                            row[0] for row in db_manager.conn.execute(
+                                                f'SELECT DISTINCT "{col_name}" FROM "{table_name}" WHERE "{col_name}" IS NOT NULL ORDER BY "{col_name}"'
+                                            ).fetchall()
+                                        ]
+                                        # Add None if there are nulls
+                                        null_cnt = db_manager.conn.execute(
+                                            f'SELECT COUNT(*) FROM "{table_name}" WHERE "{col_name}" IS NULL'
+                                        ).fetchone()[0]
+                                        if null_cnt > 0:
+                                            all_vals.append("<Null>")
+                                    except Exception:
+                                        all_vals = []
+                                    
+                                    if all_vals:
+                                        selected_vals = st.multiselect(
+                                            label=f"🗂️ {col_name} (Multi)",
+                                            options=all_vals,
+                                            default=all_vals,
+                                            key=widget_key
+                                        )
+                                        if len(selected_vals) < len(all_vals):
+                                            if not selected_vals:
+                                                filters_sql.append("1=0") # No match
+                                            else:
+                                                has_null = "<Null>" in selected_vals
+                                                non_null_vals = [v for v in selected_vals if v != "<Null>"]
+                                                
+                                                sub_conds = []
+                                                if non_null_vals:
+                                                    placeholders = ", ".join(["?"] * len(non_null_vals))
+                                                    sub_conds.append(f'"{col_name}" IN ({placeholders})')
+                                                    filters_params.extend(non_null_vals)
+                                                if has_null:
+                                                    sub_conds.append(f'"{col_name}" IS NULL')
+                                                    
+                                                filters_sql.append(f"({' OR '.join(sub_conds)})")
+                                else:
+                                    text_val = st.text_input(
+                                        label=f"🔤 {col_name} (Contains)",
+                                        value="",
+                                        key=widget_key
+                                    )
+                                    if text_val.strip():
+                                        filters_sql.append(f'LOWER("{col_name}") LIKE ?')
+                                        filters_params.append(f"%{text_val.strip().lower()}%")
 
             # Section 2: Execute filtered SQL Query
             final_query = f'SELECT * FROM "{table_name}"'
