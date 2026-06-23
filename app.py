@@ -420,8 +420,8 @@ else:
         
         # We wrap the content below the HTML card in a column container to align with card borders
         with st.container():
-            # Filter By Column expander
-            with st.expander("⚙️ Filter By Column", expanded=False):
+            # On/Off Filter Control expander
+            with st.expander("👀 On/Off Filter Control", expanded=False):
                 # Initialize session state keys for the columns if they don't exist
                 for idx, (_, col_name, _, _, _, _) in enumerate(columns_info):
                     chk_key = f"chk_{table_name}_{col_name}"
