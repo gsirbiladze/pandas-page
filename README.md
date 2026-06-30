@@ -20,6 +20,7 @@ This application provides a zero-setup, self-hosted web interface to immediately
   - Case-insensitive substring search for general text fields.
 - **Data Distribution Charts**: Renders an interactive, responsive pie chart (using Altair) next to each dataset, showing percentage breakdowns. It automatically groups low-frequency values into an "Other" category and supports multi-column concatenation.
 - **Export Filters**: Download buttons are automatically generated to export your filtered query results back as CSV files.
+- **Persistent State**: Automatically remembers your UI selections (which columns are visible, and whether the filter controls are expanded or collapsed) across browser sessions using cookie storage.
 
 ---
 
@@ -29,6 +30,7 @@ The application runs on Python 3.8+ and depends on the following libraries:
 - **`duckdb`** (v0.9.0+): Used as the fast in-memory query engine.
 - **`pandas`** (v2.0.0+): For bridging query results from DuckDB to Streamlit.
 - **`altair`** (v5.0.0+): For generating clean, interactive data distribution pie charts.
+- **`streamlit-cookies-controller`**: For syncing and persisting UI selections directly in the user's browser cookies.
 
 ---
 
@@ -37,7 +39,7 @@ The application runs on Python 3.8+ and depends on the following libraries:
 ### Installation
 Ensure you have the required packages installed in your Python environment:
 ```bash
-pip install streamlit duckdb pandas altair
+pip install streamlit duckdb pandas altair streamlit-cookies-controller
 ```
 
 ### Running the App

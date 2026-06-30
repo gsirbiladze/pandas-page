@@ -114,17 +114,26 @@ def is_datetime(dtype):
     return any(dtt in dtype for dtt in dt_types)
 
 def select_all_cols(table_name, columns_info):
+    for _, col_name, _, _, _, _ in columns_info:
+        st.session_state[f"chk_{table_name}_{col_name}"] = True
     cookieController.set(table_name, ','.join([ '1' for _ in range(len(columns_info)) ]))
 
 def clear_all_cols(table_name, columns_info):
+    for _, col_name, _, _, _, _ in columns_info:
+        st.session_state[f"chk_{table_name}_{col_name}"] = False
     cookieController.set(table_name, ','.join([ '0' for _ in range(len(columns_info)) ]))
 
-def save_chk_status(table_name, current_tbl_cookie_store_stat, idx):
-    current_tbl_cookie_store_stat[idx] = not(current_tbl_cookie_store_stat[idx])
-    cookieController.set(table_name, ','.join([ str(int(chk_stat)) for chk_stat in current_tbl_cookie_store_stat ]) )
+def save_chk_status(table_name, columns_info):
+    chk_stats = []
+    for _, col_name, _, _, _, _ in columns_info:
+        chk_key = f"chk_{table_name}_{col_name}"
+        chk_stats.append(str(int(st.session_state.get(chk_key, False))))
+    cookieController.set(table_name, ','.join(chk_stats))
 
-def save_expander_status(table_name, current_tbl_expander_status):
-    cookieController.set(f"{table_name}_expander", int(not(current_tbl_expander_status)))
+def save_expander_status(table_name):
+    expander_key = f"tbl_fltr_on_off_expander_{table_name}"
+    is_expanded = st.session_state.get(expander_key, False)
+    cookieController.set(f"{table_name}_expander", int(is_expanded))
 
 # 4. Streamlit UI Setup
 st.set_page_config(
@@ -359,6 +368,11 @@ st.markdown("<div class='subtitle'>Real-time interactive dashboard to query, fil
 # Find which tables are selected
 active_tables = [t_name for t_name, is_active in toggles.items() if is_active]
 
+# Retrieve all cookies at once to avoid multiple async get calls
+all_cookies = cookieController.getAll()
+if all_cookies is None:
+    all_cookies = {}
+
 if not active_tables:
     # Beautiful Empty State
     st.markdown("""
@@ -417,10 +431,9 @@ else:
             continue
 
 
-        # Read saved context from cookies
-        raw_tbl_expander_status = cookieController.get(f"{table_name}_expander")
-        raw_tbl_cookie_store = cookieController.get(table_name)
-        # print(f"{table_name}: {raw_tbl_cookie_store}")
+        # Read saved context from cookies dictionary
+        raw_tbl_expander_status = all_cookies.get(f"{table_name}_expander")
+        raw_tbl_cookie_store = all_cookies.get(table_name)
         
         try:
             tbl_expander_status = bool(int(raw_tbl_expander_status))
@@ -433,6 +446,17 @@ else:
             tbl_expander_status = False
             # If a cookie hasn't been initialized yet we need first 3 columns to be checked.
             tbl_cookie_store = [ (row_idx<3) for row_idx in range(len(columns_info)) ]
+
+
+        # Initialize the expander and checkbox keys in session state if they don't exist
+        expander_key = f"tbl_fltr_on_off_expander_{table_name}"
+        if expander_key not in st.session_state:
+            st.session_state[expander_key] = tbl_expander_status
+
+        for idx, (_, col_name, _, _, _, _) in enumerate(columns_info):
+            chk_key = f"chk_{table_name}_{col_name}"
+            if chk_key not in st.session_state:
+                st.session_state[chk_key] = tbl_cookie_store[idx]
 
 
         # Render Table Card
@@ -450,12 +474,7 @@ else:
         # We wrap the content below the HTML card in a column container to align with card borders
         with st.container():
             # On/Off Filter Control expander
-            with st.expander("👀 On/Off Filter Control", key=f"tbl_fltr_on_off_expander_{table_name}", expanded=tbl_expander_status, on_change=save_expander_status, args=(table_name, tbl_expander_status)):
-                # Initialize session state keys for the columns if they don't exist
-                for idx, (_, col_name, _, _, _, _) in enumerate(columns_info):
-                    chk_key = f"chk_{table_name}_{col_name}"
-                    st.session_state[chk_key] = tbl_cookie_store[idx]
-
+            with st.expander("👀 On/Off Filter Control", key=expander_key, on_change=save_expander_status, args=(table_name,)):
                 # 1. Column list checkboxes
                 col_slots_chk = st.columns(3)
                 selected_cols = []
@@ -467,7 +486,7 @@ else:
                             label=col_name,
                             key=chk_key,
                             on_change=save_chk_status,
-                            args=(table_name, tbl_cookie_store, idx)
+                            args=(table_name, columns_info)
                         )
                         if is_checked:
                             selected_cols.append(col_name)
