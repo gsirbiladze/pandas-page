@@ -135,6 +135,8 @@ def save_expander_status(table_name):
     is_expanded = st.session_state.get(expander_key, False)
     cookieController.set(f"{table_name}_expander", int(is_expanded))
 
+# Callbacks for dynamic search no longer needed because st.multiselect handles accept_new_options directly.
+
 # 4. Streamlit UI Setup
 st.set_page_config(
     page_title=APP_TITLE,
@@ -661,14 +663,29 @@ else:
                                                     
                                                 filters_sql.append(f"({' OR '.join(sub_conds)})")
                                 else:
-                                    text_val = st.text_input(
-                                        label=f"🔤 {col_name} (Contains)",
-                                        value="",
-                                        key=widget_key
+                                    # --- st.multiselect with accept_new_options ---
+                                    if widget_key not in st.session_state:
+                                        st.session_state[widget_key] = []
+                                    
+                                    current_options = list(st.session_state[widget_key])
+                                    
+                                    terms = st.multiselect(
+                                        label=f"🔤 {col_name} (Search)",
+                                        options=current_options,
+                                        key=widget_key,
+                                        accept_new_options=True,
+                                        placeholder="Type search term and press Enter..."
                                     )
-                                    if text_val.strip():
-                                        filters_sql.append(f'LOWER("{col_name}") LIKE ?')
-                                        filters_params.append(f"%{text_val.strip().lower()}%")
+
+                                    if terms:
+                                        term_conds = []
+                                        for term in terms:
+                                            if term.strip():
+                                                term_conds.append(f'LOWER("{col_name}") LIKE ?')
+                                                filters_params.append(f"%{term.strip().lower()}%")
+                                        if term_conds:
+                                            filters_sql.append(f"({' OR '.join(term_conds)})")
+
 
             # Section 2: Execute filtered SQL Query
             final_query = f'SELECT * FROM "{table_name}"'
