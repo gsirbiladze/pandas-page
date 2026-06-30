@@ -8,6 +8,9 @@ import duckdb
 import altair as alt
 import streamlit as st
 
+from streamlit_cookies_controller import CookieController
+
+
 # 1. Parse command line arguments
 @st.cache_resource
 def parse_cli_args():
@@ -95,6 +98,8 @@ def get_db_manager(directory):
 
 db_manager = get_db_manager(TARGET_DIR)
 
+cookieController = CookieController(key="cookie_sync_manager")
+
 # 3. Helpers for filter generation
 def is_numeric(dtype):
     dtype = dtype.upper()
@@ -109,12 +114,17 @@ def is_datetime(dtype):
     return any(dtt in dtype for dtt in dt_types)
 
 def select_all_cols(table_name, columns_info):
-    for (_, col_name, _, _, _, _) in columns_info:
-        st.session_state[f"chk_{table_name}_{col_name}"] = True
+    cookieController.set(table_name, ','.join([ '1' for _ in range(len(columns_info)) ]))
 
 def clear_all_cols(table_name, columns_info):
-    for (_, col_name, _, _, _, _) in columns_info:
-        st.session_state[f"chk_{table_name}_{col_name}"] = False
+    cookieController.set(table_name, ','.join([ '0' for _ in range(len(columns_info)) ]))
+
+def save_chk_status(table_name, current_tbl_cookie_store_stat, idx):
+    current_tbl_cookie_store_stat[idx] = not(current_tbl_cookie_store_stat[idx])
+    cookieController.set(table_name, ','.join([ str(int(chk_stat)) for chk_stat in current_tbl_cookie_store_stat ]) )
+
+def save_expander_status(table_name, current_tbl_expander_status):
+    cookieController.set(f"{table_name}_expander", int(not(current_tbl_expander_status)))
 
 # 4. Streamlit UI Setup
 st.set_page_config(
@@ -406,6 +416,25 @@ else:
             st.error(f"Error querying metadata for table `{table_name}`: {e}")
             continue
 
+
+        # Read saved context from cookies
+        raw_tbl_expander_status = cookieController.get(f"{table_name}_expander")
+        raw_tbl_cookie_store = cookieController.get(table_name)
+        # print(f"{table_name}: {raw_tbl_cookie_store}")
+        
+        try:
+            tbl_expander_status = bool(int(raw_tbl_expander_status))
+            # In case there is a cookie but it's damaged or there is no cookie yet
+            tbl_cookie_store = [ bool(int(col_id_val)) for col_id_val in raw_tbl_cookie_store.split(',')]
+            if len(tbl_cookie_store) != len(columns_info):
+                # need to re-initialize
+                raise(BaseException('Ooops'))
+        except:
+            tbl_expander_status = False
+            # If a cookie hasn't been initialized yet we need first 3 columns to be checked.
+            tbl_cookie_store = [ (row_idx<3) for row_idx in range(len(columns_info)) ]
+
+
         # Render Table Card
         st.markdown(f"""
         <div class='table-card'>
@@ -421,12 +450,11 @@ else:
         # We wrap the content below the HTML card in a column container to align with card borders
         with st.container():
             # On/Off Filter Control expander
-            with st.expander("👀 On/Off Filter Control", expanded=False):
+            with st.expander("👀 On/Off Filter Control", key=f"tbl_fltr_on_off_expander_{table_name}", expanded=tbl_expander_status, on_change=save_expander_status, args=(table_name, tbl_expander_status)):
                 # Initialize session state keys for the columns if they don't exist
                 for idx, (_, col_name, _, _, _, _) in enumerate(columns_info):
                     chk_key = f"chk_{table_name}_{col_name}"
-                    if chk_key not in st.session_state:
-                        st.session_state[chk_key] = (idx < 3)
+                    st.session_state[chk_key] = tbl_cookie_store[idx]
 
                 # 1. Column list checkboxes
                 col_slots_chk = st.columns(3)
@@ -437,7 +465,9 @@ else:
                     with slot_chk:
                         is_checked = st.checkbox(
                             label=col_name,
-                            key=chk_key
+                            key=chk_key,
+                            on_change=save_chk_status,
+                            args=(table_name, tbl_cookie_store, idx)
                         )
                         if is_checked:
                             selected_cols.append(col_name)
