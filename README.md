@@ -13,24 +13,23 @@ This application provides a zero-setup, self-hosted web interface to immediately
 - **Auto-Discovery**: Instantly scans a target directory at startup and loads all discovered datasets.
 - **SQL-Powered Backend**: Uses an in-memory DuckDB connection to query datasets efficiently.
 - **Automatic Directory Monitoring**: Periodically scans the folder in the background (using an interval you define) to automatically hot-reload modified files and drop tables for deleted files.
-- **Type-Aware Filtering**: Automatically scans columns and renders custom filter widgets based on data type:
-  - Range sliders for numeric columns.
-  - Date range pickers for date and time fields.
-  - Multiselect dropdowns for categorical columns with low cardinality.
-  - Case-insensitive substring search for general text fields.
-- **Data Distribution Charts**: Renders an interactive, responsive pie chart (using Altair) next to each dataset, showing percentage breakdowns. It automatically groups low-frequency values into an "Other" category and supports multi-column concatenation.
+- **Unified Logical Filtering**:
+  - All non-date columns are searched simultaneously using the **Filter Expression** search bar.
+  - Supports logical expressions using `"AND"`, `"OR"`, `"NOT"`, `"("`, and `")"` blocks (implicit `"OR"` linker if no operator is specified).
+  - Supports field query syntax: exact match (`field=value`), numeric ranges (`field>value` or `field<value`), and boolean switches.
+  - Automatically falls back to case-insensitive plain text search across all non-date fields.
+- **Type-Aware Date Filters**: Dedicated date range pickers are rendered side-by-side with the search widget for date/time columns.
+- **Data Distribution Charts**: Renders an interactive, responsive pie chart (using Altair) next to each dataset, showing percentage breakdowns. Group-by columns dynamically sync with visible dataframe columns and default to selecting all columns.
 - **Export Filters**: Download buttons are automatically generated to export your filtered query results back as CSV files.
-- **Persistent State**: Automatically remembers your UI selections (which columns are visible, and whether the filter controls are expanded or collapsed) across browser sessions using cookie storage.
 
 ---
 
 ## 3. Library Dependencies
 The application runs on Python 3.8+ and depends on the following libraries:
-- **`streamlit`** (v1.33.0+): For rendering the interactive web UI and sidebar toggles.
+- **`streamlit`** (v1.33.0+): For rendering the interactive web UI.
 - **`duckdb`** (v0.9.0+): Used as the fast in-memory query engine.
 - **`pandas`** (v2.0.0+): For bridging query results from DuckDB to Streamlit.
 - **`altair`** (v5.0.0+): For generating clean, interactive data distribution pie charts.
-- **`streamlit-cookies-controller`**: For syncing and persisting UI selections directly in the user's browser cookies.
 
 ---
 
@@ -39,7 +38,7 @@ The application runs on Python 3.8+ and depends on the following libraries:
 ### Installation
 Ensure you have the required packages installed in your Python environment:
 ```bash
-pip install streamlit duckdb pandas altair streamlit-cookies-controller
+pip install streamlit duckdb pandas altair
 ```
 
 ### Running the App
