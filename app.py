@@ -8,7 +8,7 @@ import duckdb
 import altair as alt
 import streamlit as st
 
-from streamlit_cookies_controller import CookieController
+# Cookie persistence removed
 
 
 # 1. Parse command line arguments
@@ -98,8 +98,6 @@ def get_db_manager(directory):
 
 db_manager = get_db_manager(TARGET_DIR)
 
-cookieController = CookieController(key="cookie_sync_manager")
-
 # 3. Helpers for filter generation
 def is_numeric(dtype):
     dtype = dtype.upper()
@@ -112,30 +110,6 @@ def is_datetime(dtype):
     dtype = dtype.upper()
     dt_types = ["DATE", "TIME", "TIMESTAMP", "TIMESTAMPTZ"]
     return any(dtt in dtype for dtt in dt_types)
-
-def select_all_cols(table_name, columns_info):
-    for _, col_name, _, _, _, _ in columns_info:
-        st.session_state[f"chk_{table_name}_{col_name}"] = True
-    cookieController.set(table_name, ','.join([ '1' for _ in range(len(columns_info)) ]))
-
-def clear_all_cols(table_name, columns_info):
-    for _, col_name, _, _, _, _ in columns_info:
-        st.session_state[f"chk_{table_name}_{col_name}"] = False
-    cookieController.set(table_name, ','.join([ '0' for _ in range(len(columns_info)) ]))
-
-def save_chk_status(table_name, columns_info):
-    chk_stats = []
-    for _, col_name, _, _, _, _ in columns_info:
-        chk_key = f"chk_{table_name}_{col_name}"
-        chk_stats.append(str(int(st.session_state.get(chk_key, False))))
-    cookieController.set(table_name, ','.join(chk_stats))
-
-def save_expander_status(table_name):
-    expander_key = f"tbl_fltr_on_off_expander_{table_name}"
-    is_expanded = st.session_state.get(expander_key, False)
-    cookieController.set(f"{table_name}_expander", int(is_expanded))
-
-# Callbacks for dynamic search no longer needed because st.multiselect handles accept_new_options directly.
 
 # 4. Streamlit UI Setup
 st.set_page_config(
@@ -304,6 +278,25 @@ div[data-testid="column"]:has(.clear-btn) button:active {
     color: #a855f7 !important;
     background-color: transparent !important;
 }
+
+/* Custom CSS to wrap Filter Expression and Date/Time Filters */
+div[data-testid="stHorizontalBlock"]:has(.filter-layout-marker) {
+    flex-wrap: wrap !important;
+}
+
+div[data-testid="stHorizontalBlock"]:has(.filter-layout-marker) > div[data-testid="column"] {
+    min-width: 250px !important;
+    flex-basis: 250px !important;
+    flex-grow: 1 !important;
+    width: auto !important;
+}
+
+div[data-testid="stHorizontalBlock"]:has(.filter-layout-marker) > div[data-testid="column"]:first-child {
+    min-width: 350px !important;
+    flex-basis: 350px !important;
+    flex-grow: 3 !important;
+    width: auto !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -370,10 +363,7 @@ st.markdown("<div class='subtitle'>Real-time interactive dashboard to query, fil
 # Find which tables are selected
 active_tables = [t_name for t_name, is_active in toggles.items() if is_active]
 
-# Retrieve all cookies at once to avoid multiple async get calls
-all_cookies = cookieController.getAll()
-if all_cookies is None:
-    all_cookies = {}
+# Cookie retrieval removed
 
 if not active_tables:
     # Beautiful Empty State
@@ -433,270 +423,239 @@ else:
             continue
 
 
-        # Read saved context from cookies dictionary
-        raw_tbl_expander_status = all_cookies.get(f"{table_name}_expander")
-        raw_tbl_cookie_store = all_cookies.get(table_name)
+        # # Render Table Card
+        # st.markdown(f"""
+        # <div class='table-card'>
+        #     <div style='display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(120, 120, 120, 0.2); padding-bottom: 10px; margin-bottom: 20px;'>
+        #         <h3 style='margin: 0; font-size: 1.5rem;'>📄 {display_name}</h3>
+        #         <span class='status-badge status-active'>
+        #             ⚡ <b>{total_rows}</b> rows, <b>{len(columns_info)}</b> columns
+        #         </span>
+        #     </div>
+        # </div>
+        # """, unsafe_allow_html=True)
         
-        try:
-            tbl_expander_status = bool(int(raw_tbl_expander_status))
-            # In case there is a cookie but it's damaged or there is no cookie yet
-            tbl_cookie_store = [ bool(int(col_id_val)) for col_id_val in raw_tbl_cookie_store.split(',')]
-            if len(tbl_cookie_store) != len(columns_info):
-                # need to re-initialize
-                raise(BaseException('Ooops'))
-        except:
-            tbl_expander_status = False
-            # If a cookie hasn't been initialized yet we need first 3 columns to be checked.
-            tbl_cookie_store = [ (row_idx<3) for row_idx in range(len(columns_info)) ]
-
-
-        # Initialize the expander and checkbox keys in session state if they don't exist
-        expander_key = f"tbl_fltr_on_off_expander_{table_name}"
-        if expander_key not in st.session_state:
-            st.session_state[expander_key] = tbl_expander_status
-
-        for idx, (_, col_name, _, _, _, _) in enumerate(columns_info):
-            chk_key = f"chk_{table_name}_{col_name}"
-            if chk_key not in st.session_state:
-                st.session_state[chk_key] = tbl_cookie_store[idx]
-
-
-        # Render Table Card
-        st.markdown(f"""
-        <div class='table-card'>
-            <div style='display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(120, 120, 120, 0.2); padding-bottom: 10px; margin-bottom: 20px;'>
-                <h3 style='margin: 0; font-size: 1.5rem;'>📄 {display_name}</h3>
-                <span class='status-badge status-active'>
-                    ⚡ <b>{total_rows}</b> rows, <b>{len(columns_info)}</b> columns
-                </span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
+        st.markdown(
+            """
+            <style>
+            .stExpander summary p {
+                font-size: 22px;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
         # We wrap the content below the HTML card in a column container to align with card borders
         with st.container():
-            # On/Off Filter Control expander
-            with st.expander("👀 On/Off Filter Control", key=expander_key, on_change=save_expander_status, args=(table_name,)):
-                # 1. Column list checkboxes
-                col_slots_chk = st.columns(3)
-                selected_cols = []
-                for idx, (_, col_name, _, _, _, _) in enumerate(columns_info):
-                    slot_chk = col_slots_chk[idx % 3]
-                    chk_key = f"chk_{table_name}_{col_name}"
-                    with slot_chk:
-                        is_checked = st.checkbox(
-                            label=col_name,
-                            key=chk_key,
-                            on_change=save_chk_status,
-                            args=(table_name, columns_info)
-                        )
-                        if is_checked:
-                            selected_cols.append(col_name)
-
-                # Spacing/Divider
-                st.markdown("<hr style='margin: 12px 0 8px 0; border: 0; border-top: 1px dashed rgba(120, 120, 120, 0.2);'>", unsafe_allow_html=True)
-
-                # 2. Select All / Clear buttons styled as neat links underneath
-                col_btn1, col_btn2, _ = st.columns([1, 1, 8])
-                with col_btn1:
-                    st.markdown('<div class="select-all-btn"></div>', unsafe_allow_html=True)
-                    st.button(
-                        "Select All",
-                        key=f"sel_all_{table_name}",
-                        on_click=select_all_cols,
-                        args=(table_name, columns_info),
-                        use_container_width=True
-                    )
-                with col_btn2:
-                    st.markdown('<div class="clear-btn"></div>', unsafe_allow_html=True)
-                    st.button(
-                        "Clear",
-                        key=f"clear_all_{table_name}",
-                        on_click=clear_all_cols,
-                        args=(table_name, columns_info),
-                        use_container_width=True
-                    )
-
             # Section 1: Filters Expander
-            with st.expander(f"🔍 Filter Controls for {display_name}", expanded=True):
+            with st.expander(f"**Name: {display_name},  Rows: {total_rows},  Columns: {len(columns_info)}**", expanded=True):
                 filters_sql = []
                 filters_params = []
                 
-                if not selected_cols:
-                    st.info("No columns selected for filtering. Please select columns in the panel above.")
-                else:
-                    # We show filters in a dynamic grid of columns (up to 3 columns)
-                    col_slots = st.columns(3)
-                    filtered_cols_info = [col for col in columns_info if col[1] in selected_cols]
-                    
-                    for idx, (col_id, col_name, col_type, _, _, _) in enumerate(filtered_cols_info):
-                        slot = col_slots[idx % 3]
-                        widget_key = f"filter_{table_name}_{col_name}"
+                # Separate columns
+                dt_cols = []
+                non_dt_cols = []
+                for col in columns_info:
+                    col_name = col[1]
+                    col_type = col[2]
+                    if is_datetime(col_type):
+                        dt_cols.append(col)
+                    else:
+                        non_dt_cols.append(col)
+                
+                # Render layout marker to target this horizontal block with CSS
+                st.markdown('<div class="filter-layout-marker"></div>', unsafe_allow_html=True)
+                
+                # We have 1 column for Filter Expression (ratio 2), and 1 column for each dt_col (ratio 1)
+                col_ratios = [2] + [1] * len(dt_cols)
+                filter_slots = st.columns(col_ratios)
+                
+                selected_tags = []
+                # Slot 0: Filter Expression
+                with filter_slots[0]:
+                    if non_dt_cols:
+                        search_key = f"unified_search_{table_name}"
                         
-                        with slot:
-                            # Case 1: Numeric Filters
-                            if is_numeric(col_type):
+                        if search_key not in st.session_state:
+                            st.session_state[search_key] = []
+                        
+                        current_selections = st.session_state[search_key]
+                        
+                        # Count current occurrences of each operator to offer the next unique suffix
+                        num_and = sum(1 for x in current_selections if x.replace('\u200b', '') == 'AND')
+                        num_or = sum(1 for x in current_selections if x.replace('\u200b', '') == 'OR')
+                        num_not = sum(1 for x in current_selections if x.replace('\u200b', '') == 'NOT')
+                        num_open = sum(1 for x in current_selections if x.replace('\u200b', '') == '(')
+                        num_close = sum(1 for x in current_selections if x.replace('\u200b', '') == ')')
+                        
+                        predefined_options = [
+                            "AND" + "\u200b" * num_and,
+                            "OR" + "\u200b" * num_or,
+                            "NOT" + "\u200b" * num_not,
+                            "(" + "\u200b" * num_open,
+                            ")" + "\u200b" * num_close
+                        ]
+                        
+                        options_pool = list(predefined_options)
+                        for opt in current_selections:
+                            if opt not in options_pool:
+                                options_pool.append(opt)
+                                
+                        selected_tags = st.multiselect(
+                            label="🔍 Filter Expression",
+                            options=options_pool,
+                            key=search_key,
+                            accept_new_options=True,
+                            placeholder="Type search terms or select logical operators (AND, OR, NOT, (, ))...",
+                            help="Syntax Examples:\n- name=Alice\n- age>30\n- active=false\n- plain text like Houston\n\nUse logical operators AND, OR, NOT, (, ) to build complex expressions (default is OR)."
+                        )
+                
+                # Slots 1 to N: dt_cols
+                for idx, (col_id, col_name, col_type, _, _, _) in enumerate(dt_cols):
+                    slot = filter_slots[idx + 1]
+                    widget_key = f"filter_{table_name}_{col_name}"
+                    with slot:
+                        try:
+                            min_date_val, max_date_val = db_manager.conn.execute(
+                                f'SELECT MIN("{col_name}"), MAX("{col_name}") FROM "{table_name}"'
+                            ).fetchone()
+                        except Exception:
+                            min_date_val, max_date_val = None, None
+                        
+                        # Handle converting to date
+                        if min_date_val is not None and max_date_val is not None:
+                            if isinstance(min_date_val, str):
                                 try:
-                                    min_val, max_val = db_manager.conn.execute(
-                                        f'SELECT MIN("{col_name}"), MAX("{col_name}") FROM "{table_name}"'
-                                    ).fetchone()
+                                    min_date = datetime.datetime.strptime(min_date_val.split()[0], "%Y-%m-%d").date()
+                                    max_date = datetime.datetime.strptime(max_date_val.split()[0], "%Y-%m-%d").date()
                                 except Exception:
-                                    min_val, max_val = None, None
-                                    
-                                if min_val is not None and max_val is not None and min_val < max_val:
-                                    # Convert to float for slider compatibility
-                                    min_f = float(min_val)
-                                    max_f = float(max_val)
-                                    # Determine range slider value
-                                    slider_val = st.slider(
-                                        label=f"🔢 {col_name} (Range)",
-                                        min_value=min_f,
-                                        max_value=max_f,
-                                        value=(min_f, max_f),
+                                    min_date, max_date = None, None
+                            elif isinstance(min_date_val, (datetime.date, datetime.datetime)):
+                                min_date = min_date_val.date() if isinstance(min_date_val, datetime.datetime) else min_date_val
+                                max_date = max_date_val.date() if isinstance(max_date_val, datetime.datetime) else max_date_val
+                            else:
+                                min_date, max_date = None, None
+                                
+                            if min_date and max_date:
+                                if min_date < max_date:
+                                    date_range = st.date_input(
+                                        label=f"📅 {col_name} (Range)",
+                                        value=(min_date, max_date),
+                                        min_value=min_date,
+                                        max_value=max_date,
                                         key=widget_key
                                     )
-                                    filters_sql.append(f'"{col_name}" BETWEEN ? AND ?')
-                                    filters_params.extend([slider_val[0], slider_val[1]])
-                                elif min_val is not None:
-                                    st.info(f"🔢 {col_name} (Constant: {min_val})")
-                                    
-                            # Case 2: Boolean Filters
-                            elif col_type.upper() in ["BOOLEAN", "BOOL"]:
-                                bool_choice = st.selectbox(
-                                    label=f"🔘 {col_name}",
-                                    options=["All", "True", "False"],
-                                    index=0,
-                                    key=widget_key
-                                )
-                                if bool_choice == "True":
-                                    filters_sql.append(f'"{col_name}" = TRUE')
-                                elif bool_choice == "False":
-                                    filters_sql.append(f'"{col_name}" = FALSE')
-                                    
-                            # Case 3: Datetime / Date Filters
-                            elif is_datetime(col_type):
-                                try:
-                                    min_date_val, max_date_val = db_manager.conn.execute(
-                                        f'SELECT MIN("{col_name}"), MAX("{col_name}") FROM "{table_name}"'
-                                    ).fetchone()
-                                except Exception:
-                                    min_date_val, max_date_val = None, None
-                                
-                                # Handle converting to date
-                                if min_date_val is not None and max_date_val is not None:
-                                    # Standardize date values
-                                    if isinstance(min_date_val, str):
-                                        # Strip time parts if needed
-                                        min_date = datetime.datetime.strptime(min_date_val.split()[0], "%Y-%m-%d").date()
-                                        max_date = datetime.datetime.strptime(max_date_val.split()[0], "%Y-%m-%d").date()
-                                    elif isinstance(min_date_val, (datetime.date, datetime.datetime)):
-                                        min_date = min_date_val.date() if isinstance(min_date_val, datetime.datetime) else min_date_val
-                                        max_date = max_date_val.date() if isinstance(max_date_val, datetime.datetime) else max_date_val
-                                    else:
-                                        min_date, max_date = None, None
-                                        
-                                    if min_date and max_date:
-                                        if min_date < max_date:
-                                            date_range = st.date_input(
-                                                label=f"📅 {col_name} (Range)",
-                                                value=(min_date, max_date),
-                                                min_value=min_date,
-                                                max_value=max_date,
-                                                key=widget_key
-                                            )
-                                            if isinstance(date_range, tuple) and len(date_range) == 2:
-                                                filters_sql.append(f'CAST("{col_name}" AS DATE) BETWEEN ? AND ?')
-                                                filters_params.extend([date_range[0], date_range[1]])
-                                            elif isinstance(date_range, tuple) and len(date_range) == 1:
-                                                filters_sql.append(f'CAST("{col_name}" AS DATE) >= ?')
-                                                filters_params.append(date_range[0])
-                                        else:
-                                            st.info(f"📅 {col_name} (Constant: {min_date})")
-                                
-                            # Case 4: Text or Categorical Select Filters
-                            else:
-                                # Let's count unique values
-                                try:
-                                    unique_cnt = db_manager.conn.execute(
-                                        f'SELECT COUNT(DISTINCT "{col_name}") FROM "{table_name}"'
-                                    ).fetchone()[0]
-                                except Exception:
-                                    unique_cnt = 999
-                                    
-                                if unique_cnt <= 12:
-                                    try:
-                                        all_vals = [
-                                            row[0] for row in db_manager.conn.execute(
-                                                f'SELECT DISTINCT "{col_name}" FROM "{table_name}" WHERE "{col_name}" IS NOT NULL ORDER BY "{col_name}"'
-                                            ).fetchall()
-                                        ]
-                                        # Add None if there are nulls
-                                        null_cnt = db_manager.conn.execute(
-                                            f'SELECT COUNT(*) FROM "{table_name}" WHERE "{col_name}" IS NULL'
-                                        ).fetchone()[0]
-                                        if null_cnt > 0:
-                                            all_vals.append("<Null>")
-                                    except Exception:
-                                        all_vals = []
-                                    
-                                    if all_vals:
-                                        selected_vals = st.multiselect(
-                                            label=f"🗂️ {col_name} (Multi)",
-                                            options=all_vals,
-                                            default=all_vals,
-                                            key=widget_key
-                                        )
-                                        if len(selected_vals) < len(all_vals):
-                                            if not selected_vals:
-                                                filters_sql.append("1=0") # No match
-                                            else:
-                                                has_null = "<Null>" in selected_vals
-                                                non_null_vals = [v for v in selected_vals if v != "<Null>"]
-                                                
-                                                sub_conds = []
-                                                if non_null_vals:
-                                                    placeholders = ", ".join(["?"] * len(non_null_vals))
-                                                    sub_conds.append(f'"{col_name}" IN ({placeholders})')
-                                                    filters_params.extend(non_null_vals)
-                                                if has_null:
-                                                    sub_conds.append(f'"{col_name}" IS NULL')
-                                                    
-                                                filters_sql.append(f"({' OR '.join(sub_conds)})")
+                                    if isinstance(date_range, tuple) and len(date_range) == 2:
+                                        filters_sql.append(f'CAST("{col_name}" AS DATE) BETWEEN ? AND ?')
+                                        filters_params.extend([date_range[0], date_range[1]])
+                                    elif isinstance(date_range, tuple) and len(date_range) == 1:
+                                        filters_sql.append(f'CAST("{col_name}" AS DATE) >= ?')
+                                        filters_params.append(date_range[0])
                                 else:
-                                    # --- st.multiselect with accept_new_options ---
-                                    if widget_key not in st.session_state:
-                                        st.session_state[widget_key] = []
+                                    st.info(f"📅 {col_name} (Constant: {min_date})")
+                
+                # Process unified search tags
+                if selected_tags:
+                    # Clean tags: strip invisible zero-width spaces used to enforce widget uniqueness
+                    cleaned_tags = [t.replace('\u200b', '').strip() for t in selected_tags]
+                    cleaned_tags = [t for t in cleaned_tags if t]
+                    
+                    col_mapping = {}
+                    for col_id, col_name, col_type, _, _, _ in non_dt_cols:
+                        col_mapping[col_name.lower()] = (col_name, col_type)
+                    
+                    logical_operators = {"AND", "OR", "NOT", "(", ")"}
+                    processed_tokens = []
+                    
+                    for idx, token in enumerate(cleaned_tags):
+                        token_str = token
+                        
+                        if idx > 0:
+                            prev = cleaned_tags[idx - 1]
+                            prev_is_operand = (prev not in logical_operators) or (prev == ")")
+                            curr_is_operand_start = (token_str not in logical_operators) or (token_str in {"(", "NOT"})
+                            
+                            if prev_is_operand and curr_is_operand_start:
+                                processed_tokens.append("OR")
+                        
+                        processed_tokens.append(token_str)
+                    
+                    sql_parts = []
+                    tag_params = []
+                    
+                    cast_exprs = [f"CAST(\"{col[1]}\" AS VARCHAR)" for col in non_dt_cols]
+                    combined_text_expr = f"CONCAT_WS(' ', {', '.join(cast_exprs)})"
+                    
+                    for token in processed_tokens:
+                        if token in logical_operators:
+                            sql_parts.append(token)
+                        else:
+                            match = re.match(r'^([^=><]+)([=><])(.+)$', token)
+                            compiled_cond = None
+                            
+                            if match:
+                                field_name = match.group(1).strip()
+                                op = match.group(2)
+                                val_str = match.group(3).strip()
+                                
+                                if field_name.lower() in col_mapping:
+                                    actual_col, col_type = col_mapping[field_name.lower()]
                                     
-                                    current_options = list(st.session_state[widget_key])
-                                    
-                                    terms = st.multiselect(
-                                        label=f"🔤 {col_name} (Search)",
-                                        options=current_options,
-                                        key=widget_key,
-                                        accept_new_options=True,
-                                        placeholder="Type search term and press Enter..."
-                                    )
-
-                                    if terms:
-                                        term_conds = []
-                                        for term in terms:
-                                            if term.strip():
-                                                term_conds.append(f'LOWER("{col_name}") LIKE ?')
-                                                filters_params.append(f"%{term.strip().lower()}%")
-                                        if term_conds:
-                                            filters_sql.append(f"({' OR '.join(term_conds)})")
-
+                                    if op == '=':
+                                        if col_type.upper() in ["BOOLEAN", "BOOL"]:
+                                            if val_str.lower() in ["1", "true"]:
+                                                compiled_cond = f'"{actual_col}" = TRUE'
+                                            elif val_str.lower() in ["0", "false"]:
+                                                compiled_cond = f'"{actual_col}" = FALSE'
+                                        elif is_numeric(col_type):
+                                            try:
+                                                val_num = float(val_str)
+                                                compiled_cond = f'"{actual_col}" = ?'
+                                                tag_params.append(val_num)
+                                            except ValueError:
+                                                pass
+                                        else:
+                                            compiled_cond = f'LOWER("{actual_col}") = LOWER(?)'
+                                            tag_params.append(val_str)
+                                            
+                                    elif op in ['>', '<'] and is_numeric(col_type):
+                                        try:
+                                            val_num = float(val_str)
+                                            compiled_cond = f'"{actual_col}" {op} ?'
+                                            tag_params.append(val_num)
+                                        except ValueError:
+                                            pass
+                            
+                            if compiled_cond is None:
+                                compiled_cond = f'LOWER({combined_text_expr}) LIKE ?'
+                                tag_params.append(f'%{token.lower()}%')
+                            
+                            sql_parts.append(compiled_cond)
+                    
+                    if sql_parts:
+                        sub_query = " ".join(sql_parts)
+                        filters_sql.append(f"({sub_query})")
+                        filters_params.extend(tag_params)
 
             # Section 2: Execute filtered SQL Query
             final_query = f'SELECT * FROM "{table_name}"'
             if filters_sql:
                 final_query += " WHERE " + " AND ".join(filters_sql)
                 
+            last_df_key = f"last_df_{table_name}"
+            if last_df_key not in st.session_state:
+                st.session_state[last_df_key] = None
+                
             try:
                 df_filtered = db_manager.conn.execute(final_query, filters_params).df()
+                st.session_state[last_df_key] = df_filtered
             except Exception as e:
-                st.error(f"Error querying table data: {e}")
-                df_filtered = pd.DataFrame()
+                st.warning("⚠️ Invalid search query syntax. Please check your parenthesis, logical operators, or column names.")
+                # st.error(f"Details: {e}")
+                if st.session_state[last_df_key] is not None:
+                    df_filtered = st.session_state[last_df_key]
+                else:
+                    df_filtered = pd.DataFrame()
             
             # Section 3: Render Dataframe & Download Button
             if not df_filtered.empty:
@@ -725,9 +684,9 @@ else:
                 with col_chart:
                     st.markdown("<h4 style='margin-top: 0;'>📊 Data Distribution</h4>", unsafe_allow_html=True)
                     # Multiselect for columns
-                    cols_list = [col[1] for col in columns_info]
-                    # Select default column (first one)
-                    default_sel = [cols_list[0]] if cols_list else []
+                    cols_list = list(df_filtered.columns)
+                    # Select default from all currently available columns
+                    default_sel = cols_list
                     selected_chart_cols = st.multiselect(
                         label="Group by Column(s)",
                         options=cols_list,
