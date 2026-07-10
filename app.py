@@ -703,11 +703,18 @@ else:
                                 return val[:max_len-3] + "..."
                             return val
                         
+                        def safe_str(val):
+                            if pd.isna(val) or val is None:
+                                return "Null"
+                            return str(val)
+
                         # Concatenate columns
                         if len(selected_chart_cols) == 1:
-                            series = df_filtered[selected_chart_cols[0]].astype(str)
+                            series = df_filtered[selected_chart_cols[0]].apply(safe_str)
                         else:
-                            series = df_filtered[selected_chart_cols].astype(str).agg(' - '.join, axis=1)
+                            series = df_filtered[selected_chart_cols].apply(
+                                lambda row: ' - '.join(safe_str(val) for val in row), axis=1
+                            )
                         
                         # Shorten the concatenated text
                         series_shortened = series.apply(lambda x: shorten_val(x, 18))
