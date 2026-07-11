@@ -516,9 +516,16 @@ else:
                     widget_key = f"filter_{table_name}_{col_name}"
                     with slot:
                         try:
-                            min_date_val, max_date_val = db_manager.conn.execute(
-                                f'SELECT MIN("{col_name}"), MAX("{col_name}") FROM "{table_name}"'
-                            ).fetchone()
+                            # Cast timezone-aware timestamps to naive TIMESTAMP to prevent pytz dependency issues
+                            col_type_upper = col_type.upper()
+                            if "ZONE" in col_type_upper or "TZ" in col_type_upper:
+                                min_date_val, max_date_val = db_manager.conn.execute(
+                                    f'SELECT MIN(CAST("{col_name}" AS TIMESTAMP)), MAX(CAST("{col_name}" AS TIMESTAMP)) FROM "{table_name}"'
+                                ).fetchone()
+                            else:
+                                min_date_val, max_date_val = db_manager.conn.execute(
+                                    f'SELECT MIN("{col_name}"), MAX("{col_name}") FROM "{table_name}"'
+                                ).fetchone()
                         except Exception:
                             min_date_val, max_date_val = None, None
                         
